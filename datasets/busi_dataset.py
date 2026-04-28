@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Mar 20 12:37:16 2026
-
-@author: Santosh Prakash
-"""
-
 import os
 import cv2
 import torch
