@@ -18,7 +18,7 @@ import torchvision.transforms.functional as TF
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-from models.hybridsegnet import HybridSegNet
+from models.hybridsegnet import TSSMUNet
 from losses.hybrid_loss import HybridLoss
 from utils.metrics import dice_score, iou_score
 
