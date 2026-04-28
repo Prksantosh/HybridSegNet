@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-5-Fold Cross-Validation Training Script for TSSM-UNet
-Author: Santosh Prakash
-"""
 
 import os
 import copy
@@ -28,9 +23,7 @@ from losses.hybrid_loss import HybridLoss
 from utils.metrics import dice_score, iou_score
 
 
-# =========================================================
-# CONFIG
-# =========================================================
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 SEED = 42
 
