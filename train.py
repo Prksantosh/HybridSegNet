@@ -1,15 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-5-Fold Cross-Validation Training Script for HybridSegNet
-
-Fixed issues:
-1. ReduceLROnPlateau compatibility: removed unsupported verbose=True
-2. Dataset dtype bug fixed: image and mask are always returned as float32 tensors
-3. Fixed ViT token mismatch: all images are resized to 224x224
-4. Added validation transform so val images are resized/normalized consistently
-5. Added safe loss calling for HybridLoss with/without epoch argument
-6. Added detailed printed states during training
-
+5-Fold Cross-Validation Training Script for TSSM-UNet
 Author: Santosh Prakash
 """
 
@@ -53,7 +44,6 @@ PIN_MEMORY = True if DEVICE == "cuda" else False
 RUN_GRID_SEARCH = False
 SAVE_ROOT = "cv_runs"
 
-# IMPORTANT: ViT pos_embed length 196 => 14x14 patches => 224x224 input for patch16
 IMG_SIZE = 224
 
 DEFAULT_CONFIG = {
@@ -82,9 +72,6 @@ SCHEDULER_PATIENCE = 5
 SCHEDULER_FACTOR = 0.5
 
 
-# =========================================================
-# REPRODUCIBILITY
-# =========================================================
 def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
@@ -95,9 +82,6 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
 
 
-# =========================================================
-# TRANSFORMS
-# =========================================================
 def get_cv_train_transform():
     return A.Compose([
         A.Resize(IMG_SIZE, IMG_SIZE),
@@ -119,9 +103,7 @@ def get_val_transform():
     ])
 
 
-# =========================================================
-# DATASET
-# =========================================================
+
 def get_sorted_file_list(folder, valid_exts=(".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")):
     files = [
         os.path.join(folder, f)
@@ -209,9 +191,6 @@ class BUSICVDataset(Dataset):
         return image, mask
 
 
-# =========================================================
-# METRICS
-# =========================================================
 def pixel_accuracy(pred_bin, mask):
     correct = (pred_bin == mask).float().sum()
     total = torch.numel(pred_bin)
@@ -234,9 +213,6 @@ def recall_score(pred_bin, mask, eps=1e-7):
     return (tp + eps) / (tp + fn + eps)
 
 
-# =========================================================
-# HELPERS
-# =========================================================
 def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 
@@ -280,9 +256,6 @@ def align_mask_to_pred(pred, mask):
     return mask
 
 
-# =========================================================
-# TRAIN / VALIDATE
-# =========================================================
 def run_one_epoch_train(model, loader, optimizer, criterion, epoch, grad_clip, threshold):
     model.train()
     running_loss = 0.0
@@ -416,9 +389,6 @@ def run_one_epoch_val(model, loader, criterion, epoch, threshold=0.5):
     }
 
 
-# =========================================================
-# ONE FOLD TRAINING
-# =========================================================
 def train_one_fold(fold_idx, train_samples, val_samples, config, run_dir):
     fold_dir = os.path.join(run_dir, f"fold_{fold_idx+1}")
     ensure_dir(fold_dir)
@@ -584,9 +554,6 @@ def train_one_fold(fold_idx, train_samples, val_samples, config, run_dir):
     return fold_summary, history
 
 
-# =========================================================
-# CROSS VALIDATION RUN
-# =========================================================
 def run_cross_validation(config, run_name="single_run"):
     set_seed(SEED)
 
@@ -662,9 +629,6 @@ def run_cross_validation(config, run_name="single_run"):
     return avg_summary
 
 
-# =========================================================
-# GRID SEARCH
-# =========================================================
 def run_grid_search():
     param_combos = get_param_combinations(GRID_SEARCH_SPACE)
 
@@ -703,9 +667,6 @@ def run_grid_search():
     print("#" * 100)
 
 
-# =========================================================
-# MAIN
-# =========================================================
 if __name__ == "__main__":
     ensure_dir(SAVE_ROOT)
     set_seed(SEED)
