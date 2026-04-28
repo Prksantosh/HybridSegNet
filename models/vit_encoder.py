@@ -1,16 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Novel ViT Encoder with:
-1. Local Positional Enhancement
-2. Gated Exponential Linear Attention
-3. Depthwise Token Mixing
-4. GEGLU Feed Forward
-5. LayerScale Stabilization
-6. Stage-wise Feature Refinement
-
-Input  : [B, C, H, W]
-Outputs: 5 stage features, each [B, N, embed_dim]
-"""
 
 import math
 import torch
@@ -18,9 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# =========================================================
-# Utility
-# =========================================================
 class DropPath(nn.Module):
     def __init__(self, drop_prob=0.0):
         super().__init__()
@@ -45,9 +29,7 @@ class LayerScale(nn.Module):
         return x * self.gamma
 
 
-# =========================================================
-# Patch Embedding with Local Positional Enhancement
-# =========================================================
+
 class PatchEmbedding(nn.Module):
     def __init__(self, img_size=224, patch_size=16, in_channels=3, embed_dim=768):
         super().__init__()
@@ -61,7 +43,7 @@ class PatchEmbedding(nn.Module):
             kernel_size=patch_size, stride=patch_size
         )
 
-        # Novelty: local positional enhancement with depthwise conv
+
         self.local_pos = nn.Conv2d(
             embed_dim, embed_dim,
             kernel_size=3, stride=1, padding=1,
@@ -71,21 +53,15 @@ class PatchEmbedding(nn.Module):
         self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
-        x = self.proj(x)                         # [B, C, H/P, W/P]
-        x = x + self.local_pos(x)               # local positional enhancement
-        x = x.flatten(2).transpose(1, 2)        # [B, N, C]
+        x = self.proj(x)                      
+        x = x + self.local_pos(x)              
+        x = x.flatten(2).transpose(1, 2)        
         x = self.norm(x)
         return x
 
 
-# =========================================================
-# Token Mixing Module
-# =========================================================
 class DepthwiseTokenMixing(nn.Module):
-    """
-    Converts token sequence [B, N, C] -> spatial -> DWConv -> tokens
-    Keeps output shape unchanged.
-    """
+
     def __init__(self, dim):
         super().__init__()
         self.dwconv = nn.Conv2d(
@@ -106,9 +82,7 @@ class DepthwiseTokenMixing(nn.Module):
         return feat
 
 
-# =========================================================
-# GEGLU Feed Forward
-# =========================================================
+
 class GEGLU(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.0):
         super().__init__()
@@ -125,17 +99,9 @@ class GEGLU(nn.Module):
         return x
 
 
-# =========================================================
-# Novel Exponential Linear Attention
-# =========================================================
+
 class ExponentialLinearAttention(nn.Module):
-    """
-    Multi-head exponential linear attention with:
-    - gated value branch
-    - learnable head temperature
-    - token mixing enhancement
-    Output shape remains [B, N, C]
-    """
+
     def __init__(self, dim, num_heads=8, eps=1e-6, use_token_mixing=True):
         super().__init__()
         assert dim % num_heads == 0, "dim must be divisible by num_heads"
@@ -148,11 +114,11 @@ class ExponentialLinearAttention(nn.Module):
         self.q_proj = nn.Linear(dim, dim)
         self.k_proj = nn.Linear(dim, dim)
         self.v_proj = nn.Linear(dim, dim)
-        self.g_proj = nn.Linear(dim, dim)  # novelty: gating branch
+        self.g_proj = nn.Linear(dim, dim) 
 
         self.out_proj = nn.Linear(dim, dim)
 
-        # learnable temperature per head
+
         self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1))
 
         self.use_token_mixing = use_token_mixing
@@ -162,7 +128,7 @@ class ExponentialLinearAttention(nn.Module):
     def _reshape_heads(self, x):
         B, N, C = x.shape
         x = x.view(B, N, self.num_heads, self.head_dim)
-        x = x.permute(0, 2, 1, 3)  # [B, H, N, D]
+        x = x.permute(0, 2, 1, 3)  
         return x
 
     def _phi(self, x):
@@ -184,11 +150,11 @@ class ExponentialLinearAttention(nn.Module):
         q = self._phi(q * self.temperature)
         k = self._phi(k)
 
-        # gated value
+
         v = v * torch.sigmoid(g)
 
-        kv = torch.einsum('bhnd,bhne->bhde', k, v)         # [B, H, D, D]
-        k_sum = k.sum(dim=2)                              # [B, H, D]
+        kv = torch.einsum('bhnd,bhne->bhde', k, v)       
+        k_sum = k.sum(dim=2)                             
         numerator = torch.einsum('bhnd,bhde->bhne', q, kv)
         denominator = torch.einsum('bhnd,bhd->bhn', q, k_sum).unsqueeze(-1) + self.eps
 
@@ -196,12 +162,10 @@ class ExponentialLinearAttention(nn.Module):
         out = out.permute(0, 2, 1, 3).contiguous().view(B, N, C)
         out = self.out_proj(out)
 
-        return out + 0.0 * residual_tokens  # keeps graph compatible, no shape change
+        return out + 0.0 * residual_tokens  
 
 
-# =========================================================
-# Stage Refinement
-# =========================================================
+
 class StageRefinement(nn.Module):
     """
     Lightweight refinement before stage output.
@@ -222,9 +186,7 @@ class StageRefinement(nn.Module):
         return x + gated
 
 
-# =========================================================
-# Transformer Block
-# =========================================================
+
 class TransformerBlock(nn.Module):
     def __init__(
         self,
@@ -256,9 +218,7 @@ class TransformerBlock(nn.Module):
         return x
 
 
-# =========================================================
-# Novel ViT Encoder
-# =========================================================
+
 class ViTEncoder(nn.Module):
     def __init__(
         self,
@@ -338,8 +298,8 @@ class ViTEncoder(nn.Module):
                     nn.init.zeros_(m.bias)
 
     def forward(self, x):
-        x = self.patch_embed(x)         # [B, N, C]
-        x = x + self.pos_embed          # [B, N, C]
+        x = self.patch_embed(x)         
+        x = x + self.pos_embed         
 
         features = []
         stage_id = 0
