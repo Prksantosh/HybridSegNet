@@ -31,7 +31,7 @@ class TokenToMap(nn.Module):
         return x.transpose(1, 2).reshape(B, D, self.H, self.W)
 
 
-class HybridSegNet(nn.Module):
+class TSSMUNet(nn.Module):
     def __init__(self, img_size=224, patch_size=16, embed_dim=320, out_channels=1):
         super().__init__()
 
